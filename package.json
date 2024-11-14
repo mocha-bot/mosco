@@ -1,0 +1,28 @@
+{
+  "name": "mosco",
+  "version": "1.0.0",
+  "description": "The Mocha Smart Contract (MoSCO) enables secure, blockchain-based purchases of premium features in Mocha Bot, providing users with decentralized, verified access to upgrades across servers.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mocha-bot/mosco.git"
+  },
+  "keywords": [
+    "mocha",
+    "smart contract",
+    "blockchain"
+  ],
+  "author": "Muhammad Wildan Aldiansyah",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mocha-bot/mosco/issues"
+  },
+  "homepage": "https://github.com/mocha-bot/mosco#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
+    "hardhat": "^2.22.15"
+  }
+}
