@@ -16,7 +16,8 @@
     "prepare": "husky install",
     "postinstall": "husky install",
     "prepack": "pinst --disable",
-    "postpack": "pinst --enable"
+    "postpack": "pinst --enable",
+    "verify:sepolia": "npx hardhat verify --network sepolia"
   },
   "repository": {
     "type": "git",
@@ -35,13 +36,19 @@
   "homepage": "https://github.com/mocha-bot/mosco#readme",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@nomicfoundation/hardhat-ignition": "^0.15.7",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.7",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.11",
+    "@nomiclabs/hardhat-etherscan": "^3.1.8",
     "@nomiclabs/hardhat-solhint": "^4.0.1",
+    "ethers": "^6.13.4",
     "hardhat": "^2.22.15",
-    "husky": "^8.0.0",
-    "pinst": "^3.0.0"
+    "husky": "^8.0.3"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.1.0"
+    "@openzeppelin/contracts": "^5.1.0",
+    "dotenv": "^16.4.5"
   }
 }
