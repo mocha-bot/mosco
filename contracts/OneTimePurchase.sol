@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
+import "@openzeppelin/contracts/ownership/Ownable.sol";
+
 import {PurchaseStatus} from "./PurchaseStatus.sol";
 
-contract OneTimePurchase {
+contract OneTimePurchase is Ownable {
     address private owner;
 
     // Mapping product reference serial to price
@@ -33,9 +35,7 @@ contract OneTimePurchase {
     // Events Product Price
     event ProductPriceUpdated(string indexed referenceSerial, uint256 amount);
 
-    constructor() {
-        owner = msg.sender;
-    }
+    constructor() Ownable(msg.sender) {}
 
     // Global functions
     function checkPurchaseStatus(
