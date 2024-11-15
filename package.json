@@ -4,8 +4,19 @@
   "description": "The Mocha Smart Contract (MoSCO) enables secure, blockchain-based purchases of premium features in Mocha Bot, providing users with decentralized, verified access to upgrades across servers.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "compile": "hardhat compile --show-stack-traces"
+    "clean": "npx hardhat clean",
+    "test": "npx hardhat test",
+    "chain": "npx hardhat node",
+    "coverage": "npx hardhat coverage",
+    "lint": "npx @biomejs/biome check . & solhint 'contracts/**/*.sol'",
+    "lint:fix": "npx @biomejs/biome format . --write & solhint contracts/**/*.sol --fix & prettier --write contracts/**/*.sol",
+    "compile": "hardhat compile --show-stack-traces",
+    "deploy:local": "npx hardhat run --network localhost scripts/deploy.ts",
+    "deploy:sepolia": "npx hardhat run --network sepolia scripts/deploy.ts",
+    "prepare": "husky install",
+    "postinstall": "husky install",
+    "prepack": "pinst --disable",
+    "postpack": "pinst --enable"
   },
   "repository": {
     "type": "git",
@@ -23,8 +34,12 @@
   },
   "homepage": "https://github.com/mocha-bot/mosco#readme",
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
-    "hardhat": "^2.22.15"
+    "@nomiclabs/hardhat-solhint": "^4.0.1",
+    "hardhat": "^2.22.15",
+    "husky": "^8.0.0",
+    "pinst": "^3.0.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.1.0"
