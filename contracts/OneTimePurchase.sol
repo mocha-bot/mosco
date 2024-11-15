@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/ownership/Ownable.sol";
 import {PurchaseStatus} from "./PurchaseStatus.sol";
 
 contract OneTimePurchase is Ownable {
-    address private owner;
-
     // Mapping product reference serial to price
     mapping(string => uint256) private productPrices;
 
@@ -82,28 +80,19 @@ contract OneTimePurchase is Ownable {
     }
 
     // Owner functions
-    function withdraw() public {
-        require(
-            msg.sender == owner,
-            "OneTimePurchase: only owner can withdraw"
-        );
-
+    function withdraw() public onlyOwner {
         uint256 contractBalance = address(this).balance;
         require(contractBalance > 0, "OneTimePurchase: no balance to withdraw");
 
-        payable(owner).transfer(contractBalance);
-        emit WithdrawalMade(owner, contractBalance);
+        payable(msg.sender).transfer(contractBalance); // Using the owner() function from Ownable
+        emit WithdrawalMade(msg.sender, contractBalance);
     }
 
     // Function to set/update the price (only owner can change)
     function setProductPrice(
         string memory _referenceSerial,
         uint256 _newPrice
-    ) public {
-        require(
-            msg.sender == owner,
-            "OneTimePurchase: only owner can set the price"
-        );
+    ) public onlyOwner {
         require(
             _newPrice > 0,
             "OneTimePurchase: price must be greater than zero"
@@ -122,9 +111,5 @@ contract OneTimePurchase is Ownable {
 
     function getBalance() public view returns (uint256) {
         return address(this).balance;
-    }
-
-    function getOwner() public view returns (address) {
-        return owner;
     }
 }
