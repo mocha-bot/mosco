@@ -6,15 +6,16 @@ import {PurchaseStatus} from "./PurchaseStatus.sol";
 contract OneTimePurchase {
     address private owner;
 
-    // Amount to be paid for the product
-    uint256 private amount;
+    // Mapping product reference serial to price
+    mapping(string => uint256) private productPrices;
 
-    // Reference Serial of the product
-    string private referenceSerial;
+    // Mapping to track the purchase status of each buyer for each product
+    mapping(address => mapping(string => PurchaseStatus)) private buyerStatus;
 
-    PurchaseStatus private purchaseStatus;
+    // Mapping to track the amount paid by each buyer
+    mapping(address => mapping(string => uint256)) private buyerAmountPaid;
 
-    // Events
+    // Events Purchase
     event PurchaseMade(
         address indexed buyer,
         string indexed referenceSerial,
@@ -29,53 +30,55 @@ contract OneTimePurchase {
 
     event WithdrawalMade(address indexed owner, uint256 amount);
 
-    constructor(uint256 _amount, string memory _referenceSerial) {
-        require(
-            _amount > 0,
-            "OneTimePurchase: price must be greater than zero"
-        );
-        require(
-            bytes(_referenceSerial).length > 0,
-            "OneTimePurchase: reference serial cannot be empty"
-        );
+    // Events Product Price
+    event ProductPriceUpdated(string indexed referenceSerial, uint256 amount);
 
+    constructor() {
         owner = msg.sender;
-        amount = _amount;
-        referenceSerial = _referenceSerial;
-        purchaseStatus = PurchaseStatus.Available;
     }
 
-    // Global function to check purchase status
-    function checkPurchaseStatus() public view returns (PurchaseStatus) {
-        return purchaseStatus;
+    // Global functions
+    function checkPurchaseStatus(
+        address _buyer,
+        string memory _referenceSerial
+    ) public view returns (PurchaseStatus) {
+        return buyerStatus[_buyer][_referenceSerial];
     }
 
     // Buyer functions
-    function purchase() public payable {
+    function purchase(string memory _referenceSerial) public payable {
+        uint256 currentPrice = productPrices[_referenceSerial];
+        require(currentPrice > 0, "OneTimePurchase: product price not set");
         require(
-            purchaseStatus == PurchaseStatus.Available,
-            "OneTimePurchase: product is not available"
+            buyerStatus[msg.sender][_referenceSerial] ==
+                PurchaseStatus.Available,
+            "OneTimePurchase: product already purchased"
         );
-        require(msg.value == amount, "OneTimePurchase: incorrect price");
+        require(msg.value == currentPrice, "OneTimePurchase: incorrect price");
 
-        purchaseStatus = PurchaseStatus.Purchased;
-        emit PurchaseMade(msg.sender, referenceSerial, amount);
+        buyerStatus[msg.sender][_referenceSerial] = PurchaseStatus.Purchased;
+        buyerAmountPaid[msg.sender][_referenceSerial] = msg.value;
+
+        emit PurchaseMade(msg.sender, _referenceSerial, currentPrice);
     }
 
-    function refund() public {
+    function refund(string memory _referenceSerial) public {
+        uint256 amountPaid = buyerAmountPaid[msg.sender][_referenceSerial];
+
+        require(amountPaid > 0, "OneTimePurchase: no purchase found");
         require(
-            purchaseStatus == PurchaseStatus.Purchased,
+            buyerStatus[msg.sender][_referenceSerial] ==
+                PurchaseStatus.Purchased,
             "OneTimePurchase: product not yet purchased"
         );
-        require(
-            address(this).balance >= amount,
-            "OneTimePurchase: insufficient balance"
-        );
 
-        purchaseStatus = PurchaseStatus.Available;
-        payable(msg.sender).transfer(amount);
+        buyerStatus[msg.sender][_referenceSerial] = PurchaseStatus.Available;
+        buyerAmountPaid[msg.sender][_referenceSerial] = 0;
 
-        emit RefundMade(msg.sender, referenceSerial, amount);
+        // Refund the buyer the amount they paid
+        payable(msg.sender).transfer(amountPaid);
+
+        emit RefundMade(msg.sender, _referenceSerial, amountPaid);
     }
 
     // Owner functions
@@ -84,21 +87,39 @@ contract OneTimePurchase {
             msg.sender == owner,
             "OneTimePurchase: only owner can withdraw"
         );
-        require(
-            purchaseStatus == PurchaseStatus.Purchased,
-            "OneTimePurchase: product not yet purchased"
-        );
 
         uint256 contractBalance = address(this).balance;
         require(contractBalance > 0, "OneTimePurchase: no balance to withdraw");
 
-        purchaseStatus = PurchaseStatus.Withdrawn;
         payable(owner).transfer(contractBalance);
-
         emit WithdrawalMade(owner, contractBalance);
     }
 
-    // Utility functions
+    // Function to set/update the price (only owner can change)
+    function setProductPrice(
+        string memory _referenceSerial,
+        uint256 _newPrice
+    ) public {
+        require(
+            msg.sender == owner,
+            "OneTimePurchase: only owner can set the price"
+        );
+        require(
+            _newPrice > 0,
+            "OneTimePurchase: price must be greater than zero"
+        );
+        productPrices[_referenceSerial] = _newPrice;
+
+        emit ProductPriceUpdated(_referenceSerial, _newPrice);
+    }
+
+    // Getters
+    function getProductPrice(
+        string memory _referenceSerial
+    ) public view returns (uint256) {
+        return productPrices[_referenceSerial];
+    }
+
     function getBalance() public view returns (uint256) {
         return address(this).balance;
     }
