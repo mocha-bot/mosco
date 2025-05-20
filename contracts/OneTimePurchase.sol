@@ -78,18 +78,18 @@ contract OneTimePurchase is Ownable, ReentrancyGuard {
     // Buyer functions
     function purchase(bytes32 referenceSerial) external payable nonReentrant {
         Product storage product = products[referenceSerial];
-        require(product.price > 0, "OneTimePurchase: product price not set");
+        require(product.price > 0, "product price not set");
 
         PurchaseItem storage purchaseItem = purchases[msg.sender].purchaseItems[
             referenceSerial
         ];
         require(
             purchaseItem.status != PurchaseStatus.Purchased,
-            "OneTimePurchase: product already purchased"
+            "product already purchased"
         );
 
         uint256 currentPrice = product.price;
-        require(msg.value == currentPrice, "OneTimePurchase: incorrect price");
+        require(msg.value == currentPrice, "incorrect price");
 
         purchaseItem.referenceSerial = referenceSerial;
         purchaseItem.amount = currentPrice;
@@ -106,17 +106,22 @@ contract OneTimePurchase is Ownable, ReentrancyGuard {
             referenceSerial
         ];
         uint256 amountPaid = purchaseItem.amount;
-        uint256 refundFee = (amountPaid * REFUND_FEE_PERCENTAGE) / 100;
+
+        uint256 refundFee = 0;
+        if (amountPaid > 0) {
+            refundFee = (amountPaid * REFUND_FEE_PERCENTAGE) / 100;
+        }
+
         uint256 refundAmount = amountPaid - refundFee;
 
-        require(amountPaid > 0, "OneTimePurchase: no purchase found");
+        require(amountPaid > 0, "no purchase found");
         require(
             purchaseItem.status == PurchaseStatus.Purchased,
-            "OneTimePurchase: product not yet purchased"
+            "product not yet purchased"
         );
         require(
             block.timestamp <= purchaseItem.maxRefundTimestamp,
-            "OneTimePurchase: refund period has ended"
+            "refund period has ended"
         );
 
         purchaseItem.status = PurchaseStatus.Refunded;
@@ -132,7 +137,7 @@ contract OneTimePurchase is Ownable, ReentrancyGuard {
         }
 
         (bool success, ) = msg.sender.call{value: refundAmount}("");
-        require(success, "OneTimePurchase: refund transfer failed");
+        require(success, "refund transfer failed");
 
         emit RefundMade(msg.sender, referenceSerial, refundAmount);
     }
@@ -164,15 +169,15 @@ contract OneTimePurchase is Ownable, ReentrancyGuard {
         uint256 contractBalance = address(this).balance;
         require(
             amount > 0,
-            "OneTimePurchase: amount must be greater than zero"
+            "amount must be greater than zero"
         );
         require(
             contractBalance >= amount,
-            "OneTimePurchase: insufficient contract balance"
+            "insufficient contract balance"
         );
 
         (bool success, ) = msg.sender.call{value: amount}("");
-        require(success, "OneTimePurchase: withdrawal transfer failed");
+        require(success, "withdrawal transfer failed");
 
         emit WithdrawalMade(msg.sender, amount);
     }
@@ -182,18 +187,18 @@ contract OneTimePurchase is Ownable, ReentrancyGuard {
         string memory name,
         uint256 price
     ) public onlyOwner {
-        require(price > 0, "OneTimePurchase: price must be greater than zero");
+        require(price > 0, "price must be greater than zero");
         require(
             referenceSerial != bytes32(0),
-            "OneTimePurchase: reference serial must not be empty"
+            "reference serial must be filled"
         );
         require(
             bytes(name).length > 0,
-            "OneTimePurchase: name must not be empty"
+            "name must not be empty"
         );
         require(
             bytes(name).length <= MAX_NAME_LENGTH,
-            "OneTimePurchase: name too long"
+            "name too long"
         );
 
         bool isNewProduct = !products[referenceSerial].isRegistered;
@@ -215,7 +220,7 @@ contract OneTimePurchase is Ownable, ReentrancyGuard {
     function removeProduct(bytes32 referenceSerial) external onlyOwner {
         require(
             products[referenceSerial].isRegistered,
-            "OneTimePurchase: product not found"
+            "product not found"
         );
         delete products[referenceSerial];
 
