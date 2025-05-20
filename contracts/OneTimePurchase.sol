@@ -3,8 +3,12 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import {PurchaseStatus} from "./PurchaseStatus.sol";
-import {RefundPeriod} from "./constant/Constant.sol";
+import {PurchaseStatus} from "./constant/PurchaseStatus.sol";
+import {
+    REFUND_PERIOD,
+    REFUND_FEE_PERCENTAGE,
+    MAX_NAME_LENGTH
+} from "./constant/Constant.sol";
 
 contract OneTimePurchase is Ownable, ReentrancyGuard {
     struct Product {
@@ -52,9 +56,6 @@ contract OneTimePurchase is Ownable, ReentrancyGuard {
     // Events for product removed
     event ProductRemoved(bytes32 indexed referenceSerial);
 
-    uint256 public constant REFUND_FEE_PERCENTAGE = 5;
-    uint256 public constant MAX_NAME_LENGTH = 64;
-
     constructor() Ownable(msg.sender) {}
 
     // Global functions
@@ -94,7 +95,7 @@ contract OneTimePurchase is Ownable, ReentrancyGuard {
         purchaseItem.amount = currentPrice;
         purchaseItem.status = PurchaseStatus.Purchased;
         purchaseItem.timestamp = block.timestamp;
-        purchaseItem.maxRefundTimestamp = block.timestamp + RefundPeriod;
+        purchaseItem.maxRefundTimestamp = block.timestamp + REFUND_PERIOD;
 
         purchases[msg.sender].totalPurchases += 1;
         emit PurchaseMade(msg.sender, referenceSerial, currentPrice);
