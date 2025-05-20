@@ -1,66 +1,81 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {PurchaseStatus} from "./PurchaseStatus.sol";
 import {RefundPeriod} from "./constant/Constant.sol";
 
-contract OneTimePurchase is Ownable {
+contract OneTimePurchase is Ownable, ReentrancyGuard {
     struct Product {
-        string referenceSerial;
+        bytes32 referenceSerial;
         string name;
-        string description;
         uint256 price;
         bool isRegistered;
     }
 
     struct PurchaseItem {
-        string referenceSerial;
         uint256 amount;
-        PurchaseStatus status;
         uint256 timestamp;
         uint256 maxRefundTimestamp;
+        bytes32 referenceSerial;
+        PurchaseStatus status;
     }
 
     struct Purchase {
-        mapping(string => PurchaseItem) purchaseItems;
+        mapping(bytes32 => PurchaseItem) purchaseItems;
         uint256 totalPurchases;
     }
 
     // Mappings for products and purchases
-    mapping(string => Product) private products;
+    mapping(bytes32 => Product) private products;
     mapping(address => Purchase) private purchases;
 
-    string[] private productReferenceSerials;
+    bytes32[] private productReferenceSerials;
 
     // Events for product purchase, refund, and owner withdrawals
     event PurchaseMade(
         address indexed buyer,
-        string indexed referenceSerial,
+        bytes32 indexed referenceSerial,
         uint256 amount
     );
     event RefundMade(
         address indexed buyer,
-        string indexed referenceSerial,
+        bytes32 indexed referenceSerial,
         uint256 amount
     );
     event WithdrawalMade(address indexed owner, uint256 amount);
 
     // Events for product updates
-    event ProductUpdated(string indexed referenceSerial, string name);
+    event ProductUpdated(bytes32 indexed referenceSerial, string name);
+
+    // Events for product removed
+    event ProductRemoved(bytes32 indexed referenceSerial);
+
+    uint256 public constant REFUND_FEE_PERCENTAGE = 5;
+    uint256 public constant MAX_NAME_LENGTH = 64;
 
     constructor() Ownable(msg.sender) {}
 
     // Global functions
     function getPurchasedItem(
         address buyer,
-        string memory referenceSerial
-    ) public view returns (PurchaseItem memory) {
+        bytes32 referenceSerial
+    ) external view returns (PurchaseItem memory) {
         return purchases[buyer].purchaseItems[referenceSerial];
     }
 
+    function hasPurchased(
+        address buyer,
+        bytes32 referenceSerial
+    ) external view returns (bool) {
+        return
+            purchases[buyer].purchaseItems[referenceSerial].status ==
+            PurchaseStatus.Purchased;
+    }
+
     // Buyer functions
-    function purchase(string memory referenceSerial) public payable {
+    function purchase(bytes32 referenceSerial) external payable nonReentrant {
         Product storage product = products[referenceSerial];
         require(product.price > 0, "OneTimePurchase: product price not set");
 
@@ -68,8 +83,7 @@ contract OneTimePurchase is Ownable {
             referenceSerial
         ];
         require(
-            purchaseItem.status != PurchaseStatus.Purchased &&
-                purchaseItem.status != PurchaseStatus.Withdrawn,
+            purchaseItem.status != PurchaseStatus.Purchased,
             "OneTimePurchase: product already purchased"
         );
 
@@ -86,11 +100,13 @@ contract OneTimePurchase is Ownable {
         emit PurchaseMade(msg.sender, referenceSerial, currentPrice);
     }
 
-    function refund(string memory referenceSerial) public {
+    function refund(bytes32 referenceSerial) external nonReentrant {
         PurchaseItem storage purchaseItem = purchases[msg.sender].purchaseItems[
             referenceSerial
         ];
         uint256 amountPaid = purchaseItem.amount;
+        uint256 refundFee = (amountPaid * REFUND_FEE_PERCENTAGE) / 100;
+        uint256 refundAmount = amountPaid - refundFee;
 
         require(amountPaid > 0, "OneTimePurchase: no purchase found");
         require(
@@ -103,12 +119,47 @@ contract OneTimePurchase is Ownable {
         );
 
         purchaseItem.status = PurchaseStatus.Refunded;
-        payable(msg.sender).transfer(amountPaid);
-        emit RefundMade(msg.sender, referenceSerial, amountPaid);
+        purchaseItem.amount = 0;
+        purchaseItem.maxRefundTimestamp = 0;
+        purchaseItem.timestamp = 0;
+        purchaseItem.referenceSerial = bytes32(0);
+
+        delete purchases[msg.sender].purchaseItems[referenceSerial];
+        purchases[msg.sender].totalPurchases -= 1;
+        if (purchases[msg.sender].totalPurchases == 0) {
+            delete purchases[msg.sender];
+        }
+
+        (bool success, ) = msg.sender.call{value: refundAmount}("");
+        require(success, "OneTimePurchase: refund transfer failed");
+
+        emit RefundMade(msg.sender, referenceSerial, refundAmount);
+    }
+
+    receive() external payable {
+        revert("Direct transfers is not allowed");
+    }
+
+    fallback() external payable {
+        revert("Direct transfers is not allowed");
     }
 
     // Owner functions
-    function withdraw(uint256 amount) public onlyOwner {
+    function getAllProducts()
+        external
+        view
+        onlyOwner
+        returns (Product[] memory)
+    {
+        uint256 length = productReferenceSerials.length;
+        Product[] memory result = new Product[](length);
+        for (uint256 i = 0; i < length; i++) {
+            result[i] = products[productReferenceSerials[i]];
+        }
+        return result;
+    }
+
+    function withdraw(uint256 amount) external onlyOwner nonReentrant {
         uint256 contractBalance = address(this).balance;
         require(
             amount > 0,
@@ -119,45 +170,75 @@ contract OneTimePurchase is Ownable {
             "OneTimePurchase: insufficient contract balance"
         );
 
-        payable(msg.sender).transfer(amount);
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "OneTimePurchase: withdrawal transfer failed");
+
         emit WithdrawalMade(msg.sender, amount);
     }
 
     function updateProduct(
-        string memory referenceSerial,
+        bytes32 referenceSerial,
         string memory name,
-        string memory description,
         uint256 price
     ) public onlyOwner {
         require(price > 0, "OneTimePurchase: price must be greater than zero");
         require(
-            bytes(referenceSerial).length > 0,
+            referenceSerial != bytes32(0),
             "OneTimePurchase: reference serial must not be empty"
         );
         require(
             bytes(name).length > 0,
             "OneTimePurchase: name must not be empty"
         );
+        require(
+            bytes(name).length <= MAX_NAME_LENGTH,
+            "OneTimePurchase: name too long"
+        );
+
+        bool isNewProduct = !products[referenceSerial].isRegistered;
 
         products[referenceSerial] = Product({
             referenceSerial: referenceSerial,
             name: name,
-            description: description,
             price: price,
             isRegistered: true
         });
 
+        if (isNewProduct) {
+            productReferenceSerials.push(referenceSerial);
+        }
+
         emit ProductUpdated(referenceSerial, name);
     }
 
-    function getBalance() public view onlyOwner returns (uint256) {
+    function removeProduct(bytes32 referenceSerial) external onlyOwner {
+        require(
+            products[referenceSerial].isRegistered,
+            "OneTimePurchase: product not found"
+        );
+        delete products[referenceSerial];
+
+        for (uint256 i = 0; i < productReferenceSerials.length; i++) {
+            if (productReferenceSerials[i] != referenceSerial) continue;
+
+            productReferenceSerials[i] = productReferenceSerials[
+                productReferenceSerials.length - 1
+            ];
+            productReferenceSerials.pop();
+            break;
+        }
+
+        emit ProductRemoved(referenceSerial);
+    }
+
+    function getBalance() external view onlyOwner returns (uint256) {
         return address(this).balance;
     }
 
     // Getters
     function getProduct(
-        string memory referenceSerial
-    ) public view returns (Product memory) {
+        bytes32 referenceSerial
+    ) external view returns (Product memory) {
         return products[referenceSerial];
     }
 }
