@@ -7,7 +7,18 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "ignore": ["./typechain-types", "./package.json", "./biome.json"]
+    "ignore": [
+      "./typechain-types",
+      "./package.json",
+      "./biome.json",
+      "artifacts/",
+      "cache/",
+      "coverage/",
+      "node_modules/",
+      "dist/",
+      "typechain-types/"
+    ],
+    "maxSize": 2000000
   },
   "formatter": {
     "enabled": true,

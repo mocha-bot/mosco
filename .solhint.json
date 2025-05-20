@@ -1,3 +1,9 @@
 {
-  "extends": "solhint:default"
+  "extends": "solhint:recommended",
+  "rules": {
+    "avoid-throw": "warn",
+    "avoid-suicide": "error",
+    "avoid-sha3": "warn",
+    "compiler-version": ["error", "^0.8.0"]
+  }
 }
